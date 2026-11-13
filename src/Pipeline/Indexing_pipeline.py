@@ -44,7 +44,7 @@ class IndexingPipeline:
             
             return "PDF indexed successfully"
         except Exception as e:
-            logger.error(f"Lỗi {e}")
+            logger.error(f"Error: {e}")
             raise CustomException(e, sys)
         
         

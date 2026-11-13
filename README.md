@@ -1,12 +1,17 @@
 # Vietnamese Banking RAG
 
-A Retrieval-Augmented Generation (RAG) project for processing Vietnamese banking documents and preparing them for semantic search.
+A Retrieval-Augmented Generation (RAG) application for querying Vietnamese banking documents using semantic search and Large Language Models (LLMs).
 
 ## 1. Overview
 
-Vietnamese Banking RAG is a document processing system that allows users to upload PDF documents, extract their content, split the content into smaller chunks, convert chunks into vector embeddings, and store them in a vector database.
+Vietnamese Banking RAG is a document question-answering system that allows users to upload banking PDF documents, process and index their content, and ask questions based on the indexed information.
 
-The project focuses on building the document ingestion and indexing pipeline as the foundation for a Vietnamese document question-answering system.
+The system uses a two-pipeline architecture:
+
+- **Indexing Pipeline:** Processes PDF documents, extracts content, creates text chunks, generates embeddings, and stores them in ChromaDB.
+- **QA Pipeline:** Embeds user queries, retrieves relevant document chunks, constructs prompts, and generates answers using an LLM.
+
+The system is designed to provide context-aware answers with references to the original documents.
 
 ### Current Scope
 
@@ -14,7 +19,13 @@ The project focuses on building the document ingestion and indexing pipeline as 
 - PDF parsing and Markdown extraction.
 - Structure-aware text chunking.
 - Text embedding generation.
-- Vector storage using ChromaDB.
+- Persistent vector storage using ChromaDB.
+- Semantic similarity search.
+- Top-K document retrieval.
+- Prompt construction with retrieved context.
+- LLM integration using Gemini 3.1 Flash-Lite.
+- Context-aware answer generation.
+- Chat API for question answering.
 - Logging and exception handling.
 
 ## 2. Tech Stack
@@ -23,21 +34,30 @@ The project focuses on building the document ingestion and indexing pipeline as 
 |---|---|
 | Programming Language | Python |
 | Backend API | FastAPI |
+| API Validation | Pydantic |
 | Document Processing | PDF Parser |
 | Text Chunking | LangChain Text Splitters |
 | Embedding | Sentence Transformers |
 | Vector Database | ChromaDB |
+| Similarity Metric | Cosine Similarity |
+| LLM | Google Gemini 3.1 Flash-Lite |
+| LLM SDK | Google Gen AI SDK |
+| Environment Variables | python-dotenv |
 | Logging | Python Logging |
 | API Testing | FastAPI Swagger UI |
 
 ## 3. System Architecture
+
+The application consists of two main processing pipelines.
+
+### 3.1. Indexing Pipeline
 
 ```text
                   Client
                     |
                     | Upload PDF
                     v
-              FastAPI Backend
+               FastAPI Backend
                     |
                     v
              Document API Router
@@ -46,21 +66,60 @@ The project focuses on building the document ingestion and indexing pipeline as 
               Save PDF to RAW_DIR
                     |
                     v
-            IndexingPipeline
+              IndexingPipeline
                     |
           +---------+---------+
           |         |         |
           v         v         v
        Parsing   Chunking  Embedding
           |         |         |
-          |         |         |
           +---------+---------+
                     |
                     v
-               Store Layer
+                Store Layer
                     |
                     v
-                ChromaDB
+                 ChromaDB
+```
+
+### 3.2. Retrieval & Generation Pipeline
+
+```text
+                  Client
+                    |
+                    | User Query
+                    v
+                Chat API
+                    |
+                    v
+                QAPipeline
+                    |
+                    v
+               Query Embedding
+                    |
+                    v
+              Similarity Search
+                    |
+                    v
+              Top-K Retrieval
+                    |
+                    v
+              Context Formatting
+                    |
+                    v
+               Prompt Template
+                    |
+                    v
+             Gemini 3.1 Flash-Lite
+                    |
+                    v
+              Generated Answer
+                    |
+                    v
+             Answer + Sources
+                    |
+                    v
+                  Client
 ```
 
 ## 4. Project Structure
@@ -69,39 +128,53 @@ The project focuses on building the document ingestion and indexing pipeline as 
 Vietnamese-Banking-RAG/
 │
 ├── data/
-│   ├── raw/                  # Original uploaded PDF files
-│   └── vectordb/             # Persistent ChromaDB storage
+│   ├── raw/                       # Original uploaded PDF files
+│   └── vectordb/                  # Persistent ChromaDB storage
 │
-├── logs/                     # Application logs
+├── logs/                          # Application logs
 │
 ├── src/
 │   ├── api/
-│   │   └── document_api.py   # PDF upload endpoint
+│   │   ├── document_api.py        # PDF upload endpoint
+│   │   └── chat_api.py            # Chat endpoint
 │   │
 │   ├── config/
-│   │   └── config.py         # Project configuration
+│   │   └── config.py              # Project configuration
 │   │
 │   ├── Parsing/
-│   │   └── parse_pdf.py      # PDF parsing
+│   │   └── parse_pdf.py           # PDF parsing
 │   │
 │   ├── Chunking/
-│   │   └── chunking.py       # Markdown chunking
+│   │   └── chunking.py            # Markdown chunking
 │   │
 │   ├── Embedding/
-│   │   └── embedding.py      # Embedding model and inference
+│   │   └── embedding.py           # Embedding model and inference
 │   │
 │   ├── Store/
-│   │   └── store.py          # ChromaDB operations
+│   │   └── store.py               # ChromaDB operations
+│   │
+│   ├── Retrieval/
+│   │   └── retriever.py           # Query embedding and retrieval
+│   │
+│   ├── Prompt/
+│   │   └── prompt_template.py     # LLM prompt template
+│   │
+│   ├── Generation/
+│   │   └── llm.py                 # Gemini integration
 │   │
 │   ├── Pipeline/
-│   │   └── indexing_pipeline.py
+│   │   ├── Indexing_pipeline.py   # Document indexing pipeline
+│   │   └── QA_pipeline.py         # Retrieval and generation pipeline
 │   │
-│   ├── logger.py             # Logging configuration
-│   ├── exception.py          # Custom exception handling
-│   └── main.py               # FastAPI application
+│   ├── logger.py                  # Logging configuration
+│   ├── exception.py               # Custom exception handling
+│   └── main.py                    # FastAPI application
 │
 ├── .env
+├── .env.example
+├── .gitignore
 ├── requirements.txt
+├── pyproject.toml
 └── README.md
 ```
 
@@ -135,6 +208,24 @@ CHUNK_OVERLAP = 200
 | `BATCH_SIZE` | Number of texts processed per embedding batch |
 | `CHUNK_SIZE` | Maximum target chunk size |
 | `CHUNK_OVERLAP` | Overlapping characters between chunks |
+
+### Environment Variables
+
+The project uses environment variables to store API credentials.
+
+Create a `.env` file in the project root:
+
+```env
+GEMINI_API_KEY=your_gemini_api_key
+```
+
+A `.env.example` file can be provided as a configuration template:
+
+```env
+GEMINI_API_KEY=
+```
+
+Do not commit the actual `.env` file or expose API credentials in source code.
 
 ## 6. Document Ingestion Pipeline
 
@@ -197,7 +288,7 @@ Example:
 
 **Output:** List of numerical vectors.
 
-The embedding module converts textual chunks into vector representations using a sentence embedding model.
+The embedding module converts textual chunks into vector representations using a Sentence Transformer model.
 
 ```python
 def embed(texts, batch_size, model):
@@ -214,6 +305,8 @@ Key configurations:
 - Batch processing to handle multiple chunks efficiently.
 - Normalized embeddings for cosine similarity-based retrieval.
 - Python list conversion for compatibility with ChromaDB.
+
+The same embedding model is reused in both the indexing and retrieval pipelines to ensure consistent vector representations.
 
 ### 6.4. Vector Storage
 
@@ -292,17 +385,222 @@ class IndexingPipeline:
 
 The pipeline separates processing logic from API implementation, allowing it to be reused by different application interfaces.
 
-## 8. FastAPI Document Upload API
+## 8. Retrieval Pipeline
 
-The document API receives PDF files from clients and invokes the indexing pipeline.
+The retrieval pipeline searches for document chunks relevant to a user's question.
 
-### Endpoint
+It consists of two main stages:
+
+### 8.1. Query Embedding
+
+**Input:** User query.
+
+**Output:** Query embedding vector.
+
+The same embedding function and model used during indexing are reused to convert the user query into a vector.
+
+```python
+query_vector = embed(
+    texts=[query],
+    batch_size=1,
+    model=model
+)[0]
+```
+
+Using the same embedding model ensures that query vectors and document vectors share the same embedding space.
+
+### 8.2. Similarity Search and Top-K Retrieval
+
+**Input:** Query embedding vector.
+
+**Output:** Top-K relevant document chunks.
+
+The storage module performs similarity search using ChromaDB:
+
+```python
+def search(query_vec, k=5):
+    return collection.query(
+        query_embeddings=[query_vec],
+        n_results=k
+    )
+```
+
+The retrieval module combines query embedding and vector search:
+
+```python
+def retrieve(query: str, top_k: int = 5):
+
+    query_vector = embed(
+        texts=[query],
+        batch_size=1,
+        model=model
+    )[0]
+
+    results = search(query_vector, k=top_k)
+
+    return results
+```
+
+The retrieved results contain:
+
+- `documents`: Retrieved document contents.
+- `metadatas`: Associated document metadata.
+- `distances`: Similarity search distances.
+- `ids`: Retrieved chunk identifiers.
+
+The Top-K results are passed to the QA pipeline for context construction.
+
+## 9. Prompt Engineering and LLM Generation
+
+This stage combines the user query and retrieved document context to generate a context-aware answer.
+
+### 9.1. Prompt Template
+
+The prompt template defines the instructions and context provided to the LLM.
+
+The system prompt is designed for Vietnamese banking question answering.
+
+Main instructions include:
+
+- Answer using information from the retrieved context.
+- Do not invent or assume information not present in the context.
+- Indicate when the retrieved context does not contain sufficient information.
+- Respond in Vietnamese.
+- Include references to the source document and page when available.
+
+Example prompt structure:
+
+```text
+You are an AI assistant specializing in Vietnamese banking information.
+
+Instructions:
+1. Answer using only the provided context.
+2. Do not invent or assume missing information.
+3. If the context does not contain the answer, state that
+   the information cannot be found in the provided documents.
+4. Answer clearly in Vietnamese.
+5. Reference the source document and page when available.
+
+CONTEXT:
+{context}
+
+USER QUESTION:
+{question}
+```
+
+### 9.2. Gemini Integration
+
+The Generation module integrates Google Gemini through the Google Gen AI SDK.
+
+```python
+from google import genai
+import os
+
+client = genai.Client(
+    api_key=os.getenv("GEMINI_API_KEY")
+)
+
+MODEL_NAME = "gemini-3.1-flash-lite"
+
+def generate(prompt: str):
+
+    response = client.models.generate_content(
+        model=MODEL_NAME,
+        contents=prompt
+    )
+
+    return response.text
+```
+
+The generation module receives the constructed prompt and returns the LLM-generated response.
+
+## 10. QA Pipeline Implementation
+
+The `QAPipeline` class orchestrates retrieval, context formatting, prompt construction, and LLM generation.
+
+### Processing Flow
+
+1. Receive a user question.
+2. Retrieve relevant document chunks.
+3. Extract documents and metadata.
+4. Format retrieved chunks into context.
+5. Construct the prompt using the question and context.
+6. Send the prompt to Gemini.
+7. Return the generated answer and source metadata.
+
+Example:
+
+```python
+class QAPipeline:
+
+    def __init__(self, top_k: int = 5):
+        self.top_k = top_k
+
+    def answer(self, question: str):
+
+        # Step 1: Retrieve relevant chunks
+        results = retrieve(question, top_k=self.top_k)
+
+        documents = results["documents"][0]
+        metadatas = results["metadatas"][0]
+
+        if not documents:
+            return {
+                "question": question,
+                "answer": "I could not find relevant information in the documents.",
+                "sources": []
+            }
+
+        # Step 2: Build context
+        context_parts = []
+
+        for document, metadata in zip(documents, metadatas):
+
+            source = metadata.get("source", "Unknown")
+            page = metadata.get("page", "Unknown")
+
+            context_parts.append(
+                f"""
+                Source: {source}
+                Page: {page}
+                Content: {document}
+                """
+            )
+
+        context = "\n\n".join(context_parts)
+
+        # Step 3: Build prompt
+        prompt = SYSTEM_PROMPT.format(
+            context=context,
+            question=question
+        )
+
+        # Step 4: Generate answer
+        response = generate(prompt)
+
+        # Step 5: Return response
+        return {
+            "question": question,
+            "answer": response,
+            "sources": metadatas
+        }
+```
+
+The QA pipeline provides a unified interface for the complete retrieval and generation process.
+
+## 11. FastAPI APIs
+
+The application exposes REST APIs for document ingestion and question answering.
+
+### 11.1. Document Upload API
+
+**Endpoint:**
 
 | Method | Endpoint | Description |
 |---|---|---|
 | POST | `/api/v1/documents/upload` | Upload and index a PDF document |
 
-### Processing Flow
+**Processing Flow:**
 
 1. Validate the uploaded file extension.
 2. Generate a unique filename using UUID.
@@ -310,7 +608,7 @@ The document API receives PDF files from clients and invokes the indexing pipeli
 4. Execute the indexing pipeline in a thread pool.
 5. Return the indexing result to the client.
 
-### Example Request
+**Example Request:**
 
 ```bash
 curl -X POST \
@@ -318,22 +616,51 @@ curl -X POST \
   -F "file=@bank_terms.pdf"
 ```
 
-### Example Response
+### 11.2. Chat API
+
+**Endpoint:**
+
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/api/v1/chat` | Ask questions about indexed banking documents |
+
+The Chat API receives user questions and invokes the QA pipeline.
+
+**Example Request:**
 
 ```json
 {
-    "message": "PDF indexed successfully",
-    "filename": "bank_terms.pdf",
-    "stored_filename": "uuid_bank_terms.pdf",
-    "result": {
-        "source": "uuid_bank_terms.pdf",
-        "total_chunks": 25,
-        "status": "success"
-    }
+    "question": "What are the requirements for opening a credit card?"
 }
 ```
 
-## 9. Logging and Exception Handling
+**Example Response:**
+
+```json
+{
+    "question": "What are the requirements for opening a credit card?",
+    "answer": "According to the retrieved banking document...",
+    "sources": [
+        {
+            "source": "bank_terms.pdf",
+            "page": 5,
+            "chunk_id": "bank_terms.pdf-0"
+        }
+    ]
+}
+```
+
+The response structure contains:
+
+| Field | Description |
+|---|---|
+| `question` | Original user question |
+| `answer` | LLM-generated answer |
+| `sources` | Metadata of retrieved document chunks |
+
+The Chat API uses `run_in_threadpool()` to execute the synchronous QA pipeline without blocking FastAPI's event loop.
+
+## 12. Logging and Exception Handling
 
 The project implements centralized logging to monitor application execution and identify processing errors.
 
@@ -348,15 +675,16 @@ The logging system records:
 - Chunking results.
 - Embedding execution.
 - Vector database storage.
+- Retrieval and generation errors.
 - Exceptions and stack traces.
 
 ### Exception Handling
 
 A custom exception class is used to provide additional error context and traceback information.
 
-This helps identify errors across different stages of the indexing pipeline.
+API endpoints also handle exceptions and return appropriate HTTP error responses without exposing internal error details to clients.
 
-## 10. Running the Application
+## 13. Running the Application
 
 ### Install Dependencies
 
@@ -364,10 +692,14 @@ This helps identify errors across different stages of the indexing pipeline.
 pip install -r requirements.txt
 ```
 
-Make sure `python-multipart` is installed for FastAPI file uploads.
+Make sure the required dependencies are installed, including FastAPI, Uvicorn, `python-multipart`, `sentence-transformers`, `chromadb`, `google-genai`, and `python-dotenv`.
 
-```bash
-pip install python-multipart
+### Configure Environment Variables
+
+Create a `.env` file in the project root:
+
+```env
+GEMINI_API_KEY=your_gemini_api_key
 ```
 
 ### Start FastAPI
@@ -375,7 +707,7 @@ pip install python-multipart
 Run the following command from the project root:
 
 ```bash
-uvicorn src.main:app --reload
+python -m uvicorn src.main:app --reload
 ```
 
 ### Access Swagger UI
@@ -386,13 +718,11 @@ Open:
 http://127.0.0.1:8000/docs
 ```
 
-Use the document upload endpoint to upload a PDF and test the indexing pipeline.
+Use the Document Upload API to index PDF documents, then use the Chat API to ask questions about the indexed content.
 
----
+## 14. Current Development Status
 
-## 11. Current Development Status
-
-**Completed / Implemented**
+### Completed / Implemented
 
 - [x] Project configuration and directory management.
 - [x] PDF upload API structure.
@@ -401,13 +731,54 @@ Use the document upload endpoint to upload a PDF and test the indexing pipeline.
 - [x] Embedding generation integration.
 - [x] ChromaDB persistent storage integration.
 - [x] Indexing pipeline orchestration.
+- [x] Query embedding.
+- [x] Vector similarity search.
+- [x] Top-K document retrieval.
+- [x] Prompt template construction.
+- [x] Gemini LLM integration.
+- [x] Context-aware answer generation.
+- [x] QA pipeline orchestration.
+- [x] Chat API implementation.
 - [x] Logging and custom exception handling.
 
-**Next Development Stages**
+### Potential Future Improvements
 
-- [ ] Document retrieval using vector similarity search.
-- [ ] Query embedding and top-k retrieval.
-- [ ] LLM integration for answer generation.
-- [ ] Context-aware responses with source citations.
-- [ ] Chat API and conversational interface.
-- [ ] Retrieval evaluation and performance optimization.
+- [ ] Retrieval quality evaluation.
+- [ ] Similarity score thresholding.
+- [ ] Reranking retrieved chunks.
+- [ ] Improved citation generation and validation.
+- [ ] Conversation history and multi-turn chat.
+- [ ] Streaming LLM responses.
+- [ ] Frontend chat interface.
+- [ ] Performance optimization and monitoring.
+
+---
+
+## 15. End-to-End Workflow
+
+The complete application workflow is:
+
+**Document Indexing:**
+
+```text
+PDF Upload
+    → PDF Parsing
+    → Text Chunking
+    → Embedding Generation
+    → ChromaDB Storage
+```
+
+**Question Answering:**
+
+```text
+User Query
+    → Query Embedding
+    → Similarity Search
+    → Top-K Retrieval
+    → Context Formatting
+    → Prompt Construction
+    → Gemini Generation
+    → Answer + Sources
+```
+
+The two pipelines work together to provide a document-grounded question-answering system for Vietnamese banking information.

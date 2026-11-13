@@ -6,3 +6,5 @@ chromadb
 python-multipart
 fastapi
 uvicorn
+google-genai
+python-dotenv
