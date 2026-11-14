@@ -1,21 +1,21 @@
 # Vietnamese Banking RAG
 
-A Retrieval-Augmented Generation (RAG) application for querying Vietnamese banking documents using semantic search and Large Language Models (LLMs).
+A Retrieval-Augmented Generation (RAG) application for querying Vietnamese banking documents using semantic search and Large Language Models (LLMs), with a Streamlit frontend and FastAPI backend.
 
 ## 1. Overview
 
-Vietnamese Banking RAG is a document question-answering system that allows users to upload banking PDF documents, process and index their content, and ask questions based on the indexed information.
+Vietnamese Banking RAG is a document question-answering system that allows users to upload banking PDF documents, process and index their content, and ask questions based on the indexed information through a chat interface.
 
 The system uses a two-pipeline architecture:
 
 - **Indexing Pipeline:** Processes PDF documents, extracts content, creates text chunks, generates embeddings, and stores them in ChromaDB.
-- **QA Pipeline:** Embeds user queries, retrieves relevant document chunks, constructs prompts, and generates answers using an LLM.
+- **QA Pipeline:** Embeds user queries, retrieves relevant document chunks, constructs prompts, and generates answers using Gemini.
 
-The system is designed to provide context-aware answers with references to the original documents.
+A Streamlit frontend provides document upload and an interactive chat interface, while FastAPI handles the backend processing.
 
 ### Current Scope
 
-- PDF document upload through REST API.
+- PDF document upload through Streamlit and REST API.
 - PDF parsing and Markdown extraction.
 - Structure-aware text chunking.
 - Text embedding generation.
@@ -26,6 +26,9 @@ The system is designed to provide context-aware answers with references to the o
 - LLM integration using Gemini 3.1 Flash-Lite.
 - Context-aware answer generation.
 - Chat API for question answering.
+- Interactive Streamlit chat interface.
+- Retrieved source display.
+- Chat history within the current Streamlit session.
 - Logging and exception handling.
 
 ## 2. Tech Stack
@@ -33,6 +36,8 @@ The system is designed to provide context-aware answers with references to the o
 | Component | Technology |
 |---|---|
 | Programming Language | Python |
+| Frontend | Streamlit |
+| Frontend HTTP Client | Requests |
 | Backend API | FastAPI |
 | API Validation | Pydantic |
 | Document Processing | PDF Parser |
@@ -48,16 +53,50 @@ The system is designed to provide context-aware answers with references to the o
 
 ## 3. System Architecture
 
-The application consists of two main processing pipelines.
+The application consists of a Streamlit frontend, FastAPI backend, and two main processing pipelines.
 
-### 3.1. Indexing Pipeline
+### 3.1. Overall Application Architecture
+
+```text
+                 User
+                  |
+                  v
+           Streamlit Frontend
+                  |
+          +-------+-------+
+          |               |
+      Upload PDF       Chat Query
+          |               |
+          v               v
+     Document API      Chat API
+          |               |
+          v               v
+    Indexing Pipeline   QA Pipeline
+          |               |
+          v               v
+       ChromaDB <---- Retrieval
+                          |
+                          v
+                       Gemini
+                          |
+                          v
+                  Answer + Sources
+                          |
+                          v
+                   Streamlit UI
+```
+
+### 3.2. Indexing Pipeline
 
 ```text
                   Client
                     |
                     | Upload PDF
                     v
-               FastAPI Backend
+              Streamlit UI
+                    |
+                    v
+              FastAPI Backend
                     |
                     v
              Document API Router
@@ -66,7 +105,7 @@ The application consists of two main processing pipelines.
               Save PDF to RAW_DIR
                     |
                     v
-              IndexingPipeline
+               IndexingPipeline
                     |
           +---------+---------+
           |         |         |
@@ -79,29 +118,32 @@ The application consists of two main processing pipelines.
                 Store Layer
                     |
                     v
-                 ChromaDB
+                  ChromaDB
 ```
 
-### 3.2. Retrieval & Generation Pipeline
+### 3.3. Retrieval & Generation Pipeline
 
 ```text
-                  Client
+                  User
                     |
                     | User Query
                     v
-                Chat API
+              Streamlit UI
+                    |
+                    v
+                 Chat API
                     |
                     v
                 QAPipeline
                     |
                     v
-               Query Embedding
+              Query Embedding
                     |
                     v
               Similarity Search
                     |
                     v
-              Top-K Retrieval
+               Top-K Retrieval
                     |
                     v
               Context Formatting
@@ -113,13 +155,13 @@ The application consists of two main processing pipelines.
              Gemini 3.1 Flash-Lite
                     |
                     v
-              Generated Answer
+               Generated Answer
                     |
                     v
-             Answer + Sources
+               Answer + Sources
                     |
                     v
-                  Client
+              Streamlit UI
 ```
 
 ## 4. Project Structure
@@ -132,6 +174,9 @@ Vietnamese-Banking-RAG/
 │   └── vectordb/                  # Persistent ChromaDB storage
 │
 ├── logs/                          # Application logs
+│
+├── frontend/
+│   └── app.py                     # Streamlit application
 │
 ├── src/
 │   ├── api/
@@ -211,8 +256,6 @@ CHUNK_OVERLAP = 200
 
 ### Environment Variables
 
-The project uses environment variables to store API credentials.
-
 Create a `.env` file in the project root:
 
 ```env
@@ -267,20 +310,6 @@ Each chunk contains:
 
 - `page_content`: Text content.
 - `metadata`: Source document, chunk ID, and heading information.
-
-Example:
-
-```python
-{
-    "page_content": "Banking service terms...",
-    "metadata": {
-        "source": "bank_terms.pdf",
-        "chunk_id": "bank_terms.pdf-0",
-        "h1": "Account Services",
-        "h2": "Account Opening"
-    }
-}
-```
 
 ### 6.3. Embedding Generation
 
@@ -389,7 +418,7 @@ The pipeline separates processing logic from API implementation, allowing it to 
 
 The retrieval pipeline searches for document chunks relevant to a user's question.
 
-It consists of two main stages:
+It consists of two main stages.
 
 ### 8.1. Query Embedding
 
@@ -528,64 +557,6 @@ The `QAPipeline` class orchestrates retrieval, context formatting, prompt constr
 6. Send the prompt to Gemini.
 7. Return the generated answer and source metadata.
 
-Example:
-
-```python
-class QAPipeline:
-
-    def __init__(self, top_k: int = 5):
-        self.top_k = top_k
-
-    def answer(self, question: str):
-
-        # Step 1: Retrieve relevant chunks
-        results = retrieve(question, top_k=self.top_k)
-
-        documents = results["documents"][0]
-        metadatas = results["metadatas"][0]
-
-        if not documents:
-            return {
-                "question": question,
-                "answer": "I could not find relevant information in the documents.",
-                "sources": []
-            }
-
-        # Step 2: Build context
-        context_parts = []
-
-        for document, metadata in zip(documents, metadatas):
-
-            source = metadata.get("source", "Unknown")
-            page = metadata.get("page", "Unknown")
-
-            context_parts.append(
-                f"""
-                Source: {source}
-                Page: {page}
-                Content: {document}
-                """
-            )
-
-        context = "\n\n".join(context_parts)
-
-        # Step 3: Build prompt
-        prompt = SYSTEM_PROMPT.format(
-            context=context,
-            question=question
-        )
-
-        # Step 4: Generate answer
-        response = generate(prompt)
-
-        # Step 5: Return response
-        return {
-            "question": question,
-            "answer": response,
-            "sources": metadatas
-        }
-```
-
 The QA pipeline provides a unified interface for the complete retrieval and generation process.
 
 ## 11. FastAPI APIs
@@ -660,7 +631,69 @@ The response structure contains:
 
 The Chat API uses `run_in_threadpool()` to execute the synchronous QA pipeline without blocking FastAPI's event loop.
 
-## 12. Logging and Exception Handling
+## 12. Streamlit Frontend
+
+The frontend is built with Streamlit and communicates with FastAPI through HTTP requests.
+
+### 12.1. Frontend Features
+
+- PDF document upload.
+- Trigger document indexing through the Document Upload API.
+- Interactive chat interface.
+- Display user questions and generated answers.
+- Display retrieved source information, including document name and page when available.
+- Maintain chat history using Streamlit Session State during the current session.
+- Clear chat history through the sidebar.
+
+### 12.2. Frontend and Backend Integration
+
+The Streamlit application communicates with the following endpoints:
+
+| Feature | HTTP Method | API Endpoint |
+|---|---|---|
+| Upload and index PDF | POST | `/api/v1/documents/upload` |
+| Ask a question | POST | `/api/v1/chat` |
+
+The frontend sends PDF files using multipart form data and sends chat questions as JSON.
+
+Example chat request:
+
+```python
+response = requests.post(
+    CHAT_URL,
+    json={"question": question},
+    timeout=120
+)
+
+response.raise_for_status()
+result = response.json()
+
+answer = result.get("answer", "No answer returned.")
+sources = result.get("sources", [])
+```
+
+### 12.3. Chat History
+
+Streamlit Session State stores the messages during the current session.
+
+```python
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+```
+
+Each message is stored with its role and content. Assistant messages also contain retrieved source metadata.
+
+```python
+st.session_state.messages.append({
+    "role": "assistant",
+    "content": answer,
+    "sources": sources
+})
+```
+
+The chat history is rendered on subsequent Streamlit reruns. This implementation maintains session-level history; persistent conversation storage across sessions is a potential future improvement.
+
+## 13. Logging and Exception Handling
 
 The project implements centralized logging to monitor application execution and identify processing errors.
 
@@ -684,17 +717,35 @@ A custom exception class is used to provide additional error context and traceba
 
 API endpoints also handle exceptions and return appropriate HTTP error responses without exposing internal error details to clients.
 
-## 13. Running the Application
+## 14. Running the Application
 
-### Install Dependencies
+### 14.1. Install Dependencies
+
+Run from the project root:
 
 ```bash
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 ```
 
-Make sure the required dependencies are installed, including FastAPI, Uvicorn, `python-multipart`, `sentence-transformers`, `chromadb`, `google-genai`, and `python-dotenv`.
+Make sure the required dependencies are installed, including:
 
-### Configure Environment Variables
+- FastAPI
+- Uvicorn
+- python-multipart
+- sentence-transformers
+- chromadb
+- google-genai
+- python-dotenv
+- Streamlit
+- Requests
+
+If Streamlit and Requests are not included in `requirements.txt`, install them separately:
+
+```bash
+python -m pip install streamlit requests
+```
+
+### 14.2. Configure Environment Variables
 
 Create a `.env` file in the project root:
 
@@ -702,15 +753,35 @@ Create a `.env` file in the project root:
 GEMINI_API_KEY=your_gemini_api_key
 ```
 
-### Start FastAPI
+### 14.3. Start FastAPI Backend
 
-Run the following command from the project root:
+Open the first terminal at the project root:
 
 ```bash
 python -m uvicorn src.main:app --reload
 ```
 
-### Access Swagger UI
+FastAPI runs at:
+
+```text
+http://127.0.0.1:8000
+```
+
+### 14.4. Start Streamlit Frontend
+
+Open a second terminal at the project root:
+
+```bash
+python -m streamlit run frontend/app.py
+```
+
+Streamlit runs at:
+
+```text
+http://localhost:8501
+```
+
+### 14.5. Access Swagger UI
 
 Open:
 
@@ -718,9 +789,9 @@ Open:
 http://127.0.0.1:8000/docs
 ```
 
-Use the Document Upload API to index PDF documents, then use the Chat API to ask questions about the indexed content.
+Use Swagger UI to test the backend APIs independently from the frontend.
 
-## 14. Current Development Status
+## 15. Current Development Status
 
 ### Completed / Implemented
 
@@ -740,6 +811,11 @@ Use the Document Upload API to index PDF documents, then use the Chat API to ask
 - [x] QA pipeline orchestration.
 - [x] Chat API implementation.
 - [x] Logging and custom exception handling.
+- [x] Streamlit frontend implementation.
+- [x] PDF upload interface.
+- [x] Chat interface and answer display.
+- [x] Retrieved source display.
+- [x] Session-level chat history.
 
 ### Potential Future Improvements
 
@@ -747,21 +823,25 @@ Use the Document Upload API to index PDF documents, then use the Chat API to ask
 - [ ] Similarity score thresholding.
 - [ ] Reranking retrieved chunks.
 - [ ] Improved citation generation and validation.
-- [ ] Conversation history and multi-turn chat.
+- [ ] Persistent conversation history and multi-turn chat.
 - [ ] Streaming LLM responses.
-- [ ] Frontend chat interface.
+- [ ] Improved document management interface.
+- [ ] Dockerization.
+- [ ] AWS deployment.
 - [ ] Performance optimization and monitoring.
 
 ---
 
-## 15. End-to-End Workflow
+## 16. End-to-End Workflow
 
-The complete application workflow is:
+The complete application workflow consists of two main processes.
 
 **Document Indexing:**
 
 ```text
 PDF Upload
+    → Streamlit Frontend
+    → FastAPI Document API
     → PDF Parsing
     → Text Chunking
     → Embedding Generation
@@ -772,6 +852,8 @@ PDF Upload
 
 ```text
 User Query
+    → Streamlit Frontend
+    → FastAPI Chat API
     → Query Embedding
     → Similarity Search
     → Top-K Retrieval
@@ -779,6 +861,7 @@ User Query
     → Prompt Construction
     → Gemini Generation
     → Answer + Sources
+    → Streamlit Frontend
 ```
 
 The two pipelines work together to provide a document-grounded question-answering system for Vietnamese banking information.
