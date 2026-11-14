@@ -83,16 +83,16 @@ for message in st.session_state.messages:
         if message["role"] == "assistant":
             sources = message.get("sources", [])
 
-            if sources:
-                with st.expander("📚 Retrieved Sources"):
-                    for i, source in enumerate(sources, 1):
-                        st.markdown(f"**Source {i}**")
-                        st.write(
-                            f"File: {source.get('source', 'Unknown')}"
-                        )
-                        st.write(
-                            f"Page: {source.get('page', 'Unknown')}"
-                        )
+            # if sources:
+            #     with st.expander("📚 Retrieved Sources"):
+            #         for i, source in enumerate(sources, 1):
+            #             st.markdown(f"**Source {i}**")
+            #             st.write(
+            #                 f"File: {source.get('source', 'Unknown')}"
+            #             )
+            #             st.write(
+            #                 f"Page: {source.get('page', 'Unknown')}"
+            #             )
 
 #Chat input
 
@@ -126,16 +126,16 @@ if question:
                 
                 st.markdown(answer)
                 
-                if sources:
-                    with st.expander("📚 Retrieved Sources"):
-                        for i, source in enumerate(sources, 1):
-                            st.markdown(f"**Source {i}**")
-                            st.write(
-                                f"File: {source.get('source', 'Unknown')}"
-                            )
-                            st.write(
-                                f"Page: {source.get('page', 'Unknown')}"
-                            )
+                # if sources:
+                #     with st.expander("📚 Retrieved Sources"):
+                #         for i, source in enumerate(sources, 1):
+                #             st.markdown(f"**Source {i}**")
+                #             st.write(
+                #                 f"File: {source.get('source', 'Unknown')}"
+                #             )
+                #             st.write(
+                #                 f"Page: {source.get('page', 'Unknown')}"
+                #             )
 
                 st.session_state.messages.append({
                     "role": "assistant",

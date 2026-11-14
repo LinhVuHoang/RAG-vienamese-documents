@@ -36,7 +36,7 @@ class QAPipeline:
             for document, metadata in zip(documents, metadatas):
                 source = metadata.get("source","Unknown")
                 page = metadata.get("page","Unknown")
-                
+                logger.info(f"document: {document}")
                 context_parts.append(
                     f"""
                     Source: {source}
