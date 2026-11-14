@@ -1,35 +1,30 @@
 # Vietnamese Banking RAG
 
-A Retrieval-Augmented Generation (RAG) application for querying Vietnamese banking documents using semantic search and Large Language Models (LLMs), with a Streamlit frontend and FastAPI backend.
+A Retrieval-Augmented Generation (RAG) application for querying Vietnamese banking documents using semantic search and Large Language Models (LLMs). The system provides a Streamlit frontend and FastAPI backend, supporting PDF ingestion, vector-based retrieval, and context-aware question answering with source references.
 
 ## 1. Overview
 
-Vietnamese Banking RAG is a document question-answering system that allows users to upload banking PDF documents, process and index their content, and ask questions based on the indexed information through a chat interface.
+Vietnamese Banking RAG is a document question-answering system that allows users to upload banking PDF documents, index their contents, and ask questions based on the indexed information.
 
-The system uses a two-pipeline architecture:
+The application follows a two-pipeline architecture:
 
-- **Indexing Pipeline:** Processes PDF documents, extracts content, creates text chunks, generates embeddings, and stores them in ChromaDB.
-- **QA Pipeline:** Embeds user queries, retrieves relevant document chunks, constructs prompts, and generates answers using Gemini.
+- **Indexing Pipeline:** Parses PDF documents, extracts Markdown content, creates text chunks, generates embeddings, and stores them in ChromaDB.
+- **QA Pipeline:** Embeds user queries, retrieves relevant document chunks, constructs prompts, and generates answers using Google Gemini.
 
-A Streamlit frontend provides document upload and an interactive chat interface, while FastAPI handles the backend processing.
+### Key Features
 
-### Current Scope
-
-- PDF document upload through Streamlit and REST API.
-- PDF parsing and Markdown extraction.
-- Structure-aware text chunking.
-- Text embedding generation.
-- Persistent vector storage using ChromaDB.
-- Semantic similarity search.
+- Upload and index PDF documents.
+- Extract and process PDF content into Markdown.
+- Structure-aware text chunking using Markdown headings.
+- Generate text embeddings using Sentence Transformers.
+- Persistent vector storage with ChromaDB.
+- Semantic similarity search using cosine distance.
 - Top-K document retrieval.
-- Prompt construction with retrieved context.
-- LLM integration using Gemini 3.1 Flash-Lite.
-- Context-aware answer generation.
-- Chat API for question answering.
-- Interactive Streamlit chat interface.
-- Retrieved source display.
-- Chat history within the current Streamlit session.
-- Logging and exception handling.
+- Context-aware answer generation using Gemini.
+- Display retrieved source documents and page information.
+- Interactive chat interface built with Streamlit.
+- Session-level chat history.
+- Centralized logging and exception handling.
 
 ## 2. Tech Stack
 
@@ -37,7 +32,7 @@ A Streamlit frontend provides document upload and an interactive chat interface,
 |---|---|
 | Programming Language | Python |
 | Frontend | Streamlit |
-| Frontend HTTP Client | Requests |
+| HTTP Client | Requests |
 | Backend API | FastAPI |
 | API Validation | Pydantic |
 | Document Processing | PDF Parser |
@@ -47,121 +42,117 @@ A Streamlit frontend provides document upload and an interactive chat interface,
 | Similarity Metric | Cosine Similarity |
 | LLM | Google Gemini 3.1 Flash-Lite |
 | LLM SDK | Google Gen AI SDK |
-| Environment Variables | python-dotenv |
+| Configuration | python-dotenv |
 | Logging | Python Logging |
 | API Testing | FastAPI Swagger UI |
 
 ## 3. System Architecture
 
-The application consists of a Streamlit frontend, FastAPI backend, and two main processing pipelines.
+The application consists of three main components:
 
-### 3.1. Overall Application Architecture
+- **Streamlit:** Provides the user interface for document upload and question answering.
+- **FastAPI:** Exposes REST APIs and orchestrates the processing pipelines.
+- **ChromaDB:** Stores document chunks and their vector embeddings using persistent local storage.
+
+### 3.1. Overall Architecture
 
 ```text
-                 User
-                  |
-                  v
-           Streamlit Frontend
-                  |
-          +-------+-------+
-          |               |
-      Upload PDF       Chat Query
-          |               |
-          v               v
-     Document API      Chat API
-          |               |
-          v               v
-    Indexing Pipeline   QA Pipeline
-          |               |
-          v               v
-       ChromaDB <---- Retrieval
-                          |
-                          v
-                       Gemini
-                          |
-                          v
-                  Answer + Sources
-                          |
-                          v
-                   Streamlit UI
+                       User
+                         |
+                         v
+                 Streamlit Frontend
+                         |
+              +----------+----------+
+              |                     |
+          Upload PDF             Chat Query
+              |                     |
+              v                     v
+         Document API             Chat API
+              |                     |
+              v                     v
+       Indexing Pipeline         QA Pipeline
+              |                     |
+              v                     v
+           ChromaDB <---------- Retrieval
+                                    |
+                                    v
+                                  Gemini
+                                    |
+                                    v
+                             Answer + Sources
+                                    |
+                                    v
+                             Streamlit UI
 ```
 
 ### 3.2. Indexing Pipeline
 
 ```text
-                  Client
-                    |
-                    | Upload PDF
-                    v
-              Streamlit UI
-                    |
-                    v
-              FastAPI Backend
-                    |
-                    v
-             Document API Router
-                    |
-                    v
-              Save PDF to RAW_DIR
-                    |
-                    v
-               IndexingPipeline
-                    |
-          +---------+---------+
-          |         |         |
-          v         v         v
-       Parsing   Chunking  Embedding
-          |         |         |
-          +---------+---------+
-                    |
-                    v
-                Store Layer
-                    |
-                    v
-                  ChromaDB
+PDF Upload
+    |
+    v
+Streamlit Frontend
+    |
+    v
+FastAPI Document API
+    |
+    v
+Save PDF to RAW_DIR
+    |
+    v
+IndexingPipeline
+    |
+    +----------------------+
+    |          |           |
+    v          v           v
+ Parsing   Chunking    Embedding
+    |          |           |
+    +----------+-----------+
+               |
+               v
+           Store Layer
+               |
+               v
+            ChromaDB
 ```
 
-### 3.3. Retrieval & Generation Pipeline
+### 3.3. Retrieval and Generation Pipeline
 
 ```text
-                  User
-                    |
-                    | User Query
-                    v
-              Streamlit UI
-                    |
-                    v
-                 Chat API
-                    |
-                    v
-                QAPipeline
-                    |
-                    v
-              Query Embedding
-                    |
-                    v
-              Similarity Search
-                    |
-                    v
-               Top-K Retrieval
-                    |
-                    v
-              Context Formatting
-                    |
-                    v
-               Prompt Template
-                    |
-                    v
-             Gemini 3.1 Flash-Lite
-                    |
-                    v
-               Generated Answer
-                    |
-                    v
-               Answer + Sources
-                    |
-                    v
-              Streamlit UI
+User Question
+      |
+      v
+Streamlit Frontend
+      |
+      v
+FastAPI Chat API
+      |
+      v
+QAPipeline
+      |
+      v
+Query Embedding
+      |
+      v
+Similarity Search
+      |
+      v
+Top-K Retrieval
+      |
+      v
+Context Formatting
+      |
+      v
+Prompt Construction
+      |
+      v
+Gemini 3.1 Flash-Lite
+      |
+      v
+Generated Answer + Sources
+      |
+      v
+Streamlit Frontend
 ```
 
 ## 4. Project Structure
@@ -170,50 +161,50 @@ The application consists of a Streamlit frontend, FastAPI backend, and two main 
 Vietnamese-Banking-RAG/
 │
 ├── data/
-│   ├── raw/                       # Original uploaded PDF files
-│   └── vectordb/                  # Persistent ChromaDB storage
+│   ├── raw/                         # Uploaded PDF documents
+│   └── vectordb/                    # Persistent ChromaDB storage
 │
-├── logs/                          # Application logs
+├── logs/                            # Application logs
 │
 ├── frontend/
-│   └── app.py                     # Streamlit application
+│   └── app.py                       # Streamlit application
 │
 ├── src/
 │   ├── api/
-│   │   ├── document_api.py        # PDF upload endpoint
-│   │   └── chat_api.py            # Chat endpoint
+│   │   ├── document_api.py          # PDF upload endpoint
+│   │   └── chat_api.py              # Chat endpoint
 │   │
 │   ├── config/
-│   │   └── config.py              # Project configuration
+│   │   └── config.py                # Centralized configuration
 │   │
 │   ├── Parsing/
-│   │   └── parse_pdf.py           # PDF parsing
+│   │   └── parse_pdf.py             # PDF parsing
 │   │
 │   ├── Chunking/
-│   │   └── chunking.py            # Markdown chunking
+│   │   └── chunking.py              # Markdown text chunking
 │   │
 │   ├── Embedding/
-│   │   └── embedding.py           # Embedding model and inference
+│   │   └── embedding.py             # Embedding model and inference
 │   │
 │   ├── Store/
-│   │   └── store.py               # ChromaDB operations
+│   │   └── store.py                 # ChromaDB operations
 │   │
 │   ├── Retrieval/
-│   │   └── retriever.py           # Query embedding and retrieval
+│   │   └── retriever.py             # Query embedding and retrieval
 │   │
 │   ├── Prompt/
-│   │   └── prompt_template.py     # LLM prompt template
+│   │   └── prompt_template.py       # LLM prompt template
 │   │
 │   ├── Generation/
-│   │   └── llm.py                 # Gemini integration
+│   │   └── llm.py                   # Gemini integration
 │   │
 │   ├── Pipeline/
-│   │   ├── Indexing_pipeline.py   # Document indexing pipeline
-│   │   └── QA_pipeline.py         # Retrieval and generation pipeline
+│   │   ├── Indexing_pipeline.py     # Document indexing pipeline
+│   │   └── QA_pipeline.py           # Retrieval and generation pipeline
 │   │
-│   ├── logger.py                  # Logging configuration
-│   ├── exception.py               # Custom exception handling
-│   └── main.py                    # FastAPI application
+│   ├── logger.py                    # Logging configuration
+│   ├── exception.py                 # Custom exception handling
+│   └── main.py                      # FastAPI application
 │
 ├── .env
 ├── .env.example
@@ -225,7 +216,7 @@ Vietnamese-Banking-RAG/
 
 ## 5. Configuration
 
-The project uses a centralized configuration file to manage directory paths and processing parameters.
+The project uses a centralized configuration file to manage storage paths and processing parameters.
 
 Example:
 
@@ -247,11 +238,11 @@ CHUNK_OVERLAP = 200
 | Parameter | Description |
 |---|---|
 | `ROOT` | Project root directory |
-| `RAW_DIR` | Directory for original PDF documents |
+| `RAW_DIR` | Directory for uploaded PDF documents |
 | `DB_DIR` | Persistent ChromaDB storage directory |
 | `COLLECTION` | ChromaDB collection name |
 | `BATCH_SIZE` | Number of texts processed per embedding batch |
-| `CHUNK_SIZE` | Maximum target chunk size |
+| `CHUNK_SIZE` | Target chunk size |
 | `CHUNK_OVERLAP` | Overlapping characters between chunks |
 
 ### Environment Variables
@@ -262,17 +253,17 @@ Create a `.env` file in the project root:
 GEMINI_API_KEY=your_gemini_api_key
 ```
 
-A `.env.example` file can be provided as a configuration template:
+The `.env.example` file can be used as a template:
 
 ```env
 GEMINI_API_KEY=
 ```
 
-Do not commit the actual `.env` file or expose API credentials in source code.
+**Important:** Never commit your actual `.env` file or expose API credentials in source code or public repositories.
 
 ## 6. Document Ingestion Pipeline
 
-The indexing pipeline consists of four main stages.
+The indexing pipeline transforms raw PDF documents into searchable vector representations.
 
 ### 6.1. PDF Parsing
 
@@ -284,9 +275,7 @@ The indexing pipeline consists of four main stages.
 markdown_content = parse_pdf(pdf_path)
 ```
 
-The parsing module extracts textual content from PDF documents and prepares it for downstream processing.
-
-The extracted content is represented as Markdown when the parser can preserve document structure.
+The parsing module extracts textual content from PDF documents and prepares it for downstream processing. Markdown representation helps preserve document structure when available.
 
 ### 6.2. Text Chunking
 
@@ -308,8 +297,8 @@ chunk_overlap = 200
 
 Each chunk contains:
 
-- `page_content`: Text content.
-- `metadata`: Source document, chunk ID, and heading information.
+- `page_content`: Extracted text content.
+- `metadata`: Source document, chunk ID, page information when available, and heading information.
 
 ### 6.3. Embedding Generation
 
@@ -317,7 +306,7 @@ Each chunk contains:
 
 **Output:** List of numerical vectors.
 
-The embedding module converts textual chunks into vector representations using a Sentence Transformer model.
+The embedding module uses a Sentence Transformer model to convert text into vector representations.
 
 ```python
 def embed(texts, batch_size, model):
@@ -331,11 +320,11 @@ def embed(texts, batch_size, model):
 
 Key configurations:
 
-- Batch processing to handle multiple chunks efficiently.
+- Batch processing for efficient embedding generation.
 - Normalized embeddings for cosine similarity-based retrieval.
 - Python list conversion for compatibility with ChromaDB.
 
-The same embedding model is reused in both the indexing and retrieval pipelines to ensure consistent vector representations.
+The same embedding model is reused in both indexing and retrieval to ensure consistent vector representations.
 
 ### 6.4. Vector Storage
 
@@ -343,7 +332,7 @@ The same embedding model is reused in both the indexing and retrieval pipelines 
 
 **Output:** Data stored in ChromaDB.
 
-ChromaDB is initialized with persistent storage:
+ChromaDB uses persistent local storage:
 
 ```python
 client = chromadb.PersistentClient(
@@ -363,70 +352,21 @@ The storage module uses `upsert()` to store:
 | IDs | Unique chunk identifiers |
 | Documents | Original chunk text |
 | Embeddings | Vector representations |
-| Metadatas | Source and heading information |
+| Metadatas | Source and document metadata |
 
-Using persistent storage allows indexed data to remain available after restarting the application.
+Persistent storage allows indexed data to remain available after restarting the application.
 
-## 7. Indexing Pipeline Implementation
-
-The `IndexingPipeline` class orchestrates the four processing stages.
-
-```python
-class IndexingPipeline:
-
-    def __init__(self):
-        self.model = model
-
-    def ingestion_pipeline(self, pdf_path: str):
-        try:
-            source = os.path.basename(pdf_path)
-
-            # Step 1: PDF Parsing
-            markdown_content = parse_pdf(pdf_path)
-
-            # Step 2: Chunking
-            chunks = chunk_markdown(
-                markdown_content,
-                source,
-                CHUNK_SIZE,
-                CHUNK_OVERLAP
-            )
-
-            # Step 3: Embedding
-            embedded_vectors = embed(
-                [c.page_content for c in chunks],
-                BATCH_SIZE,
-                self.model
-            )
-
-            # Step 4: Vector Storage
-            add_chunks(chunks, embedded_vectors)
-
-            return {
-                "source": source,
-                "total_chunks": len(chunks),
-                "status": "success"
-            }
-
-        except Exception as e:
-            raise CustomException(e, sys)
-```
-
-The pipeline separates processing logic from API implementation, allowing it to be reused by different application interfaces.
-
-## 8. Retrieval Pipeline
+## 7. Retrieval Pipeline
 
 The retrieval pipeline searches for document chunks relevant to a user's question.
 
-It consists of two main stages.
-
-### 8.1. Query Embedding
+### 7.1. Query Embedding
 
 **Input:** User query.
 
 **Output:** Query embedding vector.
 
-The same embedding function and model used during indexing are reused to convert the user query into a vector.
+The same embedding model used during indexing converts the user query into a vector.
 
 ```python
 query_vector = embed(
@@ -436,9 +376,9 @@ query_vector = embed(
 )[0]
 ```
 
-Using the same embedding model ensures that query vectors and document vectors share the same embedding space.
+Using the same model ensures that query vectors and document vectors share the same embedding space.
 
-### 8.2. Similarity Search and Top-K Retrieval
+### 7.2. Similarity Search and Top-K Retrieval
 
 **Input:** Query embedding vector.
 
@@ -458,7 +398,6 @@ The retrieval module combines query embedding and vector search:
 
 ```python
 def retrieve(query: str, top_k: int = 5):
-
     query_vector = embed(
         texts=[query],
         batch_size=1,
@@ -470,7 +409,7 @@ def retrieve(query: str, top_k: int = 5):
     return results
 ```
 
-The retrieved results contain:
+Retrieved results contain:
 
 - `documents`: Retrieved document contents.
 - `metadatas`: Associated document metadata.
@@ -479,11 +418,11 @@ The retrieved results contain:
 
 The Top-K results are passed to the QA pipeline for context construction.
 
-## 9. Prompt Engineering and LLM Generation
+## 8. Prompt Engineering and LLM Generation
 
 This stage combines the user query and retrieved document context to generate a context-aware answer.
 
-### 9.1. Prompt Template
+### 8.1. Prompt Template
 
 The prompt template defines the instructions and context provided to the LLM.
 
@@ -517,7 +456,7 @@ USER QUESTION:
 {question}
 ```
 
-### 9.2. Gemini Integration
+### 8.2. Gemini Integration
 
 The Generation module integrates Google Gemini through the Google Gen AI SDK.
 
@@ -532,7 +471,6 @@ client = genai.Client(
 MODEL_NAME = "gemini-3.1-flash-lite"
 
 def generate(prompt: str):
-
     response = client.models.generate_content(
         model=MODEL_NAME,
         contents=prompt
@@ -543,7 +481,7 @@ def generate(prompt: str):
 
 The generation module receives the constructed prompt and returns the LLM-generated response.
 
-## 10. QA Pipeline Implementation
+## 9. QA Pipeline Implementation
 
 The `QAPipeline` class orchestrates retrieval, context formatting, prompt construction, and LLM generation.
 
@@ -553,17 +491,17 @@ The `QAPipeline` class orchestrates retrieval, context formatting, prompt constr
 2. Retrieve relevant document chunks.
 3. Extract documents and metadata.
 4. Format retrieved chunks into context.
-5. Construct the prompt using the question and context.
+5. Construct the prompt using the question and retrieved context.
 6. Send the prompt to Gemini.
 7. Return the generated answer and source metadata.
 
 The QA pipeline provides a unified interface for the complete retrieval and generation process.
 
-## 11. FastAPI APIs
+## 10. FastAPI Backend
 
 The application exposes REST APIs for document ingestion and question answering.
 
-### 11.1. Document Upload API
+### 10.1. Document Upload API
 
 **Endpoint:**
 
@@ -587,7 +525,7 @@ curl -X POST \
   -F "file=@bank_terms.pdf"
 ```
 
-### 11.2. Chat API
+### 10.2. Chat API
 
 **Endpoint:**
 
@@ -631,11 +569,23 @@ The response structure contains:
 
 The Chat API uses `run_in_threadpool()` to execute the synchronous QA pipeline without blocking FastAPI's event loop.
 
-## 12. Streamlit Frontend
+### 10.3. API Documentation
+
+FastAPI automatically generates interactive API documentation.
+
+After starting the backend, access:
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+Use Swagger UI to test the upload and chat endpoints independently from the frontend.
+
+## 11. Streamlit Frontend
 
 The frontend is built with Streamlit and communicates with FastAPI through HTTP requests.
 
-### 12.1. Frontend Features
+### 11.1. Frontend Features
 
 - PDF document upload.
 - Trigger document indexing through the Document Upload API.
@@ -645,7 +595,7 @@ The frontend is built with Streamlit and communicates with FastAPI through HTTP 
 - Maintain chat history using Streamlit Session State during the current session.
 - Clear chat history through the sidebar.
 
-### 12.2. Frontend and Backend Integration
+### 11.2. Frontend and Backend Integration
 
 The Streamlit application communicates with the following endpoints:
 
@@ -671,63 +621,43 @@ result = response.json()
 answer = result.get("answer", "No answer returned.")
 sources = result.get("sources", [])
 ```
+## 12. Running the Application Locally
 
-### 12.3. Chat History
-
-Streamlit Session State stores the messages during the current session.
-
-```python
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-```
-
-Each message is stored with its role and content. Assistant messages also contain retrieved source metadata.
-
-```python
-st.session_state.messages.append({
-    "role": "assistant",
-    "content": answer,
-    "sources": sources
-})
-```
-
-The chat history is rendered on subsequent Streamlit reruns. This implementation maintains session-level history; persistent conversation storage across sessions is a potential future improvement.
-
-## 13. Logging and Exception Handling
-
-The project implements centralized logging to monitor application execution and identify processing errors.
-
-### Logging
-
-Logs are stored in the `logs/` directory with timestamp-based filenames.
-
-The logging system records:
-
-- Pipeline execution status.
-- PDF parsing operations.
-- Chunking results.
-- Embedding execution.
-- Vector database storage.
-- Retrieval and generation errors.
-- Exceptions and stack traces.
-
-### Exception Handling
-
-A custom exception class is used to provide additional error context and traceback information.
-
-API endpoints also handle exceptions and return appropriate HTTP error responses without exposing internal error details to clients.
-
-## 14. Running the Application
-
-### 14.1. Install Dependencies
-
-Run from the project root:
+### 12.1. Clone the Repository
 
 ```bash
+git clone https://github.com/LinhVuHoang/RAG-vienamese-documents.git
+
+cd RAG-vienamese-documents
+```
+
+### 12.2. Create a Virtual Environment
+
+**Windows PowerShell:**
+
+```powershell
+python -m venv .venv
+
+.\.venv\Scripts\Activate.ps1
+```
+
+**Linux / macOS:**
+
+```bash
+python3 -m venv .venv
+
+source .venv/bin/activate
+```
+
+### 12.3. Install Dependencies
+
+```bash
+python -m pip install --upgrade pip
+
 python -m pip install -r requirements.txt
 ```
 
-Make sure the required dependencies are installed, including:
+Ensure the required dependencies are included in `requirements.txt`, such as:
 
 - FastAPI
 - Uvicorn
@@ -738,14 +668,9 @@ Make sure the required dependencies are installed, including:
 - python-dotenv
 - Streamlit
 - Requests
+- langchain-text-splitters
 
-If Streamlit and Requests are not included in `requirements.txt`, install them separately:
-
-```bash
-python -m pip install streamlit requests
-```
-
-### 14.2. Configure Environment Variables
+### 12.4. Configure Environment Variables
 
 Create a `.env` file in the project root:
 
@@ -753,7 +678,7 @@ Create a `.env` file in the project root:
 GEMINI_API_KEY=your_gemini_api_key
 ```
 
-### 14.3. Start FastAPI Backend
+### 12.5. Start FastAPI Backend
 
 Open the first terminal at the project root:
 
@@ -767,7 +692,13 @@ FastAPI runs at:
 http://127.0.0.1:8000
 ```
 
-### 14.4. Start Streamlit Frontend
+Swagger UI:
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+### 12.6. Start Streamlit Frontend
 
 Open a second terminal at the project root:
 
@@ -781,22 +712,95 @@ Streamlit runs at:
 http://localhost:8501
 ```
 
-### 14.5. Access Swagger UI
+The frontend communicates with the local FastAPI backend through the configured `API_BASE_URL`.
 
-Open:
+## 13. Deployment Architecture
+
+The application can be demonstrated remotely using Streamlit Community Cloud while keeping the FastAPI backend and ChromaDB on a local machine.
+
+### 13.1. Demo Deployment Architecture
 
 ```text
-http://127.0.0.1:8000/docs
+                  Remote User
+                       |
+                       v
+             Streamlit Community Cloud
+                       |
+                       | HTTPS Request
+                       v
+              Cloudflare Quick Tunnel
+                       |
+                       v
+                Local FastAPI
+                       |
+             +---------+---------+
+             |                   |
+             v                   v
+         QA Pipeline       Indexing Pipeline
+             |                   |
+             v                   v
+           Gemini              ChromaDB
+                                 |
+                                 v
+                         Local Persistent Disk
 ```
 
-Use Swagger UI to test the backend APIs independently from the frontend.
+### 13.2. Deployment Components
 
-## 15. Current Development Status
+| Component | Hosting / Storage |
+|---|---|
+| Streamlit Frontend | Streamlit Community Cloud |
+| FastAPI Backend | Local machine |
+| Public API Access | Cloudflare Quick Tunnel |
+| Vector Database | Local persistent ChromaDB |
+| LLM | Google Gemini API |
 
-### Completed / Implemented
+### 13.3. API Configuration
+
+For local development, the frontend can use:
+
+```python
+API_BASE_URL = os.getenv(
+    "API_BASE_URL",
+    "http://127.0.0.1:8000"
+)
+```
+
+For Streamlit Community Cloud, configure `API_BASE_URL` through Streamlit Secrets:
+
+```toml
+API_BASE_URL = "https://your-tunnel-url.trycloudflare.com"
+```
+
+The Cloudflare Quick Tunnel URL exposes the local FastAPI service to the Streamlit Cloud application.
+
+**Deployment limitations:**
+
+- The local machine must remain powered on and connected to the Internet.
+- FastAPI and Cloudflare Tunnel must remain running.
+- The Quick Tunnel URL may change when the tunnel is recreated.
+- ChromaDB remains stored on the local machine.
+- This setup is intended for demonstration and testing, not reliable production hosting.
+
+The backend and vector database are not hosted on AWS in this deployment architecture.
+
+## 14. Security Considerations
+
+When exposing the backend through a public tunnel, consider the following:
+
+- Keep the Gemini API key in environment variables or Streamlit Secrets.
+- Never commit `.env` or other credential files.
+- Protect public API endpoints with authentication before sharing the application.
+- Validate uploaded files and restrict file sizes.
+- Avoid exposing internal exception details through API responses.
+- Restrict access to document upload endpoints to prevent unauthorized indexing.
+
+## 15. Development Status
+
+### Completed
 
 - [x] Project configuration and directory management.
-- [x] PDF upload API structure.
+- [x] PDF upload API.
 - [x] PDF parsing module integration.
 - [x] Markdown-based chunking pipeline.
 - [x] Embedding generation integration.
@@ -826,42 +830,17 @@ Use Swagger UI to test the backend APIs independently from the frontend.
 - [ ] Persistent conversation history and multi-turn chat.
 - [ ] Streaming LLM responses.
 - [ ] Improved document management interface.
+- [ ] API authentication and rate limiting.
 - [ ] Dockerization.
-- [ ] AWS deployment.
+- [ ] Stable cloud deployment.
 - [ ] Performance optimization and monitoring.
 
----
+## 16. Future Development Direction
 
-## 16. End-to-End Workflow
+Potential next steps for improving the project include:
 
-The complete application workflow consists of two main processes.
-
-**Document Indexing:**
-
-```text
-PDF Upload
-    → Streamlit Frontend
-    → FastAPI Document API
-    → PDF Parsing
-    → Text Chunking
-    → Embedding Generation
-    → ChromaDB Storage
-```
-
-**Question Answering:**
-
-```text
-User Query
-    → Streamlit Frontend
-    → FastAPI Chat API
-    → Query Embedding
-    → Similarity Search
-    → Top-K Retrieval
-    → Context Formatting
-    → Prompt Construction
-    → Gemini Generation
-    → Answer + Sources
-    → Streamlit Frontend
-```
-
-The two pipelines work together to provide a document-grounded question-answering system for Vietnamese banking information.
+1. **Retrieval Evaluation:** Build a test dataset to evaluate retrieval relevance and answer quality.
+2. **Retrieval Optimization:** Experiment with similarity thresholds and reranking strategies.
+3. **Answer Reliability:** Improve source attribution and validate generated citations.
+4. **Deployment:** Move the backend and vector database to a stable hosting environment.
+5. **Production Readiness:** Introduce authentication, request limits, monitoring, and persistent conversation storage.
