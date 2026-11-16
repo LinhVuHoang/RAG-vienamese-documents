@@ -10,3 +10,4 @@ google-genai
 python-dotenv
 streamlit
 requests
+# "mcp[cli]>=1.28,<2"

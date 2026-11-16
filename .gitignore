@@ -36,3 +36,5 @@ htmlcov/
 
 #info
 rag_vietnamese_documents.egg-info/
+
+uv.lock

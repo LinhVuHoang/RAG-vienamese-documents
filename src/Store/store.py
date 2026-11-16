@@ -3,10 +3,10 @@ from src.config.config import DB_DIR, COLLECTION
 from src.logger import logger
 
 client = chromadb.PersistentClient(path=str(DB_DIR))
+# client.delete_collection(name=COLLECTION)
 collection = client.get_or_create_collection(
     COLLECTION, metadata={"hnsw:space": "cosine"}
 )
-
 logger.info(f"ChromaDB collection initialized: {COLLECTION}")
 
 def add_chunks(chunks, vectors):

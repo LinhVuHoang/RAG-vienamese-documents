@@ -1,30 +1,47 @@
 # Vietnamese Banking RAG
 
-A Retrieval-Augmented Generation (RAG) application for querying Vietnamese banking documents using semantic search and Large Language Models (LLMs). The system provides a Streamlit frontend and FastAPI backend, supporting PDF ingestion, vector-based retrieval, and context-aware question answering with source references.
+A Retrieval-Augmented Generation (RAG) application for querying Vietnamese banking documents using semantic search, Large Language Models (LLMs), and the Model Context Protocol (MCP).
+
+The system provides a Streamlit frontend, FastAPI backend, and MCP server, supporting PDF ingestion, vector-based retrieval, context-aware question answering, and integration with MCP-compatible clients.
 
 ## 1. Overview
 
 Vietnamese Banking RAG is a document question-answering system that allows users to upload banking PDF documents, index their contents, and ask questions based on the indexed information.
 
-The application follows a two-pipeline architecture:
+The project consists of three main components:
 
-- **Indexing Pipeline:** Parses PDF documents, extracts Markdown content, creates text chunks, generates embeddings, and stores them in ChromaDB.
-- **QA Pipeline:** Embeds user queries, retrieves relevant document chunks, constructs prompts, and generates answers using Google Gemini.
+- **RAG Application:** Handles document ingestion, retrieval, and question answering.
+- **Web Application:** Provides a Streamlit frontend and FastAPI backend.
+- **MCP Server:** Exposes RAG capabilities through MCP Tools, Resources, and Prompts.
 
 ### Key Features
 
+**Document Processing**
 - Upload and index PDF documents.
 - Extract and process PDF content into Markdown.
 - Structure-aware text chunking using Markdown headings.
-- Generate text embeddings using Sentence Transformers.
+- Generate embeddings using Sentence Transformers.
 - Persistent vector storage with ChromaDB.
+
+**Retrieval and Generation**
 - Semantic similarity search using cosine distance.
 - Top-K document retrieval.
-- Context-aware answer generation using Gemini.
-- Display retrieved source documents and page information.
+- Context-aware answer generation using Google Gemini.
+- Source references with document names and page information.
+
+**Web Application**
 - Interactive chat interface built with Streamlit.
+- PDF upload and indexing interface.
+- Display retrieved source documents and page information.
 - Session-level chat history.
-- Centralized logging and exception handling.
+- FastAPI REST API integration.
+
+**MCP Integration**
+- Expose document indexing and retrieval through MCP Tools.
+- Provide document metadata through MCP Resources.
+- Define reusable question-answering instructions through MCP Prompts.
+- Support integration with MCP-compatible clients.
+- Test MCP capabilities using MCP Inspector.
 
 ## 2. Tech Stack
 
@@ -32,9 +49,9 @@ The application follows a two-pipeline architecture:
 |---|---|
 | Programming Language | Python |
 | Frontend | Streamlit |
-| HTTP Client | Requests |
 | Backend API | FastAPI |
 | API Validation | Pydantic |
+| HTTP Client | Requests |
 | Document Processing | PDF Parser |
 | Text Chunking | LangChain Text Splitters |
 | Embedding | Sentence Transformers |
@@ -42,48 +59,52 @@ The application follows a two-pipeline architecture:
 | Similarity Metric | Cosine Similarity |
 | LLM | Google Gemini 3.1 Flash-Lite |
 | LLM SDK | Google Gen AI SDK |
+| MCP Framework | MCP Python SDK (FastMCP) |
+| MCP Transport | STDIO |
 | Configuration | python-dotenv |
 | Logging | Python Logging |
 | API Testing | FastAPI Swagger UI |
+| MCP Testing | MCP Inspector |
 
 ## 3. System Architecture
 
-The application consists of three main components:
-
-- **Streamlit:** Provides the user interface for document upload and question answering.
-- **FastAPI:** Exposes REST APIs and orchestrates the processing pipelines.
-- **ChromaDB:** Stores document chunks and their vector embeddings using persistent local storage.
+The application follows a modular architecture consisting of the RAG processing layer, web application layer, and MCP integration layer.
 
 ### 3.1. Overall Architecture
 
 ```text
-                       User
-                         |
-                         v
-                 Streamlit Frontend
-                         |
-              +----------+----------+
-              |                     |
-          Upload PDF             Chat Query
-              |                     |
-              v                     v
-         Document API             Chat API
-              |                     |
-              v                     v
-       Indexing Pipeline         QA Pipeline
-              |                     |
-              v                     v
-           ChromaDB <---------- Retrieval
-                                    |
-                                    v
-                                  Gemini
-                                    |
-                                    v
-                             Answer + Sources
-                                    |
-                                    v
-                             Streamlit UI
+                         User
+                           |
+               +-----------+-----------+
+               |                       |
+               v                       v
+        Streamlit Frontend       MCP-compatible Client
+               |                       |
+               v                       v
+          FastAPI Backend           MCP Server
+               |                       |
+       +-------+-------+       +-------+-------+
+       |               |       |       |       |
+       v               v       v       v       v
+  Indexing Pipeline  QA Pipeline Tools Resources Prompts
+       |               |       |       |       |
+       +-------+-------+       +-------+-------+
+               |                       |
+               v                       v
+            ChromaDB              RAG Components
+               |                       |
+               +-----------+-----------+
+                           |
+                           v
+                     Document Data
 ```
+
+The web application and MCP server provide different interfaces to the underlying RAG capabilities.
+
+- **Streamlit:** Provides the user-facing interface.
+- **FastAPI:** Exposes REST endpoints for document ingestion and question answering.
+- **MCP Server:** Exposes RAG functionality through the MCP protocol.
+- **ChromaDB:** Stores document chunks and vector embeddings.
 
 ### 3.2. Indexing Pipeline
 
@@ -91,10 +112,10 @@ The application consists of three main components:
 PDF Upload
     |
     v
-Streamlit Frontend
+Streamlit Frontend / MCP Client
     |
     v
-FastAPI Document API
+FastAPI Document API / MCP Tool
     |
     v
 Save PDF to RAW_DIR
@@ -105,7 +126,7 @@ IndexingPipeline
     +----------------------+
     |          |           |
     v          v           v
- Parsing   Chunking    Embedding
+ Parsing    Chunking    Embedding
     |          |           |
     +----------+-----------+
                |
@@ -116,19 +137,21 @@ IndexingPipeline
             ChromaDB
 ```
 
+The indexing pipeline transforms PDF documents into searchable vector representations.
+
 ### 3.3. Retrieval and Generation Pipeline
 
 ```text
 User Question
       |
       v
-Streamlit Frontend
+Streamlit / MCP Client
       |
       v
-FastAPI Chat API
+FastAPI Chat API / MCP Tool
       |
       v
-QAPipeline
+Retrieval
       |
       v
 Query Embedding
@@ -150,10 +173,71 @@ Gemini 3.1 Flash-Lite
       |
       v
 Generated Answer + Sources
-      |
-      v
-Streamlit Frontend
 ```
+
+The QA pipeline retrieves relevant document chunks and uses their contents as context for LLM generation.
+
+### 3.4. MCP Architecture
+
+The MCP server exposes three MCP primitives:
+
+```text
+                 MCP Client
+                      |
+                      v
+               MCP Server
+                      |
+          +-----------+-----------+
+          |           |           |
+          v           v           v
+        Tools      Resources    Prompts
+          |           |           |
+          v           v           v
+     RAG Actions  Document Data  Instructions
+          |
+    +-----+------+
+    |            |
+    v            v
+ Indexing     Retrieval
+ Pipeline     Pipeline
+    |            |
+    +------+-----+
+           |
+           v
+        ChromaDB
+```
+
+**Tools**
+
+Tools allow an MCP client to execute operations exposed by the server.
+
+| Tool | Description |
+|---|---|
+| `greet` | Basic tool for testing MCP connectivity |
+| `index_document` | Index a PDF document using the indexing pipeline |
+| `search_documents` | Retrieve relevant document chunks from ChromaDB |
+
+**Resources**
+
+Resources provide data that MCP clients can discover and read.
+
+| Resource URI | Description |
+|---|---|
+| `banking://documents` | Provides a list of available PDF documents and their metadata |
+
+The Resource reads document information from the configured raw PDF directory.
+
+**Prompts**
+
+Prompts provide reusable instructions that MCP clients can retrieve and use.
+
+| Prompt | Description |
+|---|---|
+| `answer_with_citations` | Provides instructions for answering Vietnamese banking questions using retrieved documents and source references |
+
+The Prompt instructs the client to use `search_documents`, answer based on retrieved evidence, and include source citations.
+
+> MCP Tools, Resources, and Prompts serve different purposes. Tools execute actions, Resources expose data, and Prompts provide reusable instructions. Their availability and interaction depend on the MCP client.
 
 ## 4. Project Structure
 
@@ -168,6 +252,13 @@ Vietnamese-Banking-RAG/
 │
 ├── frontend/
 │   └── app.py                       # Streamlit application
+│
+├── mcp_app/
+│   ├── __init__.py
+│   ├── server.py                    # MCP server initialization
+│   ├── tools.py                     # MCP tool registration
+│   ├── resources.py                 # MCP resource registration
+│   └── prompts.py                   # MCP prompt registration
 │
 ├── src/
 │   ├── api/
@@ -216,12 +307,11 @@ Vietnamese-Banking-RAG/
 
 ## 5. Configuration
 
-The project uses a centralized configuration file to manage storage paths and processing parameters.
+The project uses centralized configuration to manage storage paths and processing parameters.
 
 Example:
 
 ```python
-from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -375,8 +465,6 @@ query_vector = embed(
     model=model
 )[0]
 ```
-
-Using the same model ensures that query vectors and document vectors share the same embedding space.
 
 ### 7.2. Similarity Search and Top-K Retrieval
 
@@ -559,16 +647,6 @@ The Chat API receives user questions and invokes the QA pipeline.
 }
 ```
 
-The response structure contains:
-
-| Field | Description |
-|---|---|
-| `question` | Original user question |
-| `answer` | LLM-generated answer |
-| `sources` | Metadata of retrieved document chunks |
-
-The Chat API uses `run_in_threadpool()` to execute the synchronous QA pipeline without blocking FastAPI's event loop.
-
 ### 10.3. API Documentation
 
 FastAPI automatically generates interactive API documentation.
@@ -581,11 +659,120 @@ http://127.0.0.1:8000/docs
 
 Use Swagger UI to test the upload and chat endpoints independently from the frontend.
 
-## 11. Streamlit Frontend
+## 11. MCP Server
+
+The MCP server exposes selected RAG functionality through the Model Context Protocol.
+
+It is implemented using the Python MCP SDK and FastMCP.
+
+### 11.1. Server Initialization
+
+The MCP server initializes the FastMCP instance and registers Tools, Resources, and Prompts.
+
+The `IndexingPipeline` is initialized once and reused by the registered tools.
+
+```python
+from mcp.server.fastmcp import FastMCP
+from src.Pipeline.Indexing_pipeline import IndexingPipeline
+
+mcp = FastMCP("Vietnamese Document RAG")
+
+indexing_pipeline = IndexingPipeline()
+```
+
+The server registers the components from separate modules:
+
+```python
+register_tools(mcp, indexing_pipeline)
+register_resources(mcp)
+register_prompts(mcp)
+```
+
+The server uses STDIO transport for local MCP client integration.
+
+### 11.2. MCP Tools
+
+Tools expose executable operations to MCP clients.
+
+| Tool | Description |
+|---|---|
+| `greet` | Tests basic MCP server connectivity |
+| `index_document` | Accepts a local PDF path and executes the indexing pipeline |
+| `search_documents` | Performs semantic retrieval from the vector database |
+
+**Indexing Tool**
+
+The `index_document` tool accepts a PDF file path and invokes the existing indexing pipeline.
+
+**Search Tool**
+
+The `search_documents` tool accepts a query and retrieves relevant document chunks from ChromaDB.
+
+The search tool focuses on retrieval and does not independently generate an LLM answer.
+
+### 11.3. MCP Resources
+
+Resources expose document-related information through a URI.
+
+The project provides:
+
+```text
+banking://documents
+```
+
+This Resource returns a JSON-formatted list of PDF documents available in the configured raw document directory.
+
+The returned metadata includes:
+
+- File name.
+- File size.
+- File format.
+- Total document count.
+
+Resources allow compatible MCP clients to discover and read document information without executing an indexing operation.
+
+### 11.4. MCP Prompts
+
+The project provides the following reusable Prompt:
+
+```text
+answer_with_citations
+```
+
+It accepts:
+
+| Argument | Description |
+|---|---|
+| `question` | User's banking-related question |
+| `top_k` | Number of relevant document chunks to retrieve |
+
+The Prompt provides instructions for an MCP client to:
+
+1. Use `search_documents` to retrieve relevant document chunks.
+2. Answer based only on retrieved evidence.
+3. Include source references using document names and page numbers.
+4. Avoid fabricated information and citations.
+5. Explicitly state when the retrieved evidence is insufficient.
+6. Respond in Vietnamese.
+
+The Prompt provides instructions to the client; it does not independently execute retrieval or LLM generation.
+
+### 11.5. MCP Transport
+
+The server uses STDIO transport:
+
+```python
+if __name__ == "__main__":
+    mcp.run(transport="stdio")
+```
+
+STDIO allows a local MCP client to launch the server as a subprocess and communicate through standard input and output.
+
+## 12. Streamlit Frontend
 
 The frontend is built with Streamlit and communicates with FastAPI through HTTP requests.
 
-### 11.1. Frontend Features
+### 12.1. Frontend Features
 
 - PDF document upload.
 - Trigger document indexing through the Document Upload API.
@@ -595,9 +782,7 @@ The frontend is built with Streamlit and communicates with FastAPI through HTTP 
 - Maintain chat history using Streamlit Session State during the current session.
 - Clear chat history through the sidebar.
 
-### 11.2. Frontend and Backend Integration
-
-The Streamlit application communicates with the following endpoints:
+### 12.2. Frontend and Backend Integration
 
 | Feature | HTTP Method | API Endpoint |
 |---|---|---|
@@ -621,9 +806,10 @@ result = response.json()
 answer = result.get("answer", "No answer returned.")
 sources = result.get("sources", [])
 ```
-## 12. Running the Application Locally
 
-### 12.1. Clone the Repository
+## 13. Running the Application Locally
+
+### 13.1. Clone the Repository
 
 ```bash
 git clone https://github.com/LinhVuHoang/RAG-vienamese-documents.git
@@ -631,7 +817,7 @@ git clone https://github.com/LinhVuHoang/RAG-vienamese-documents.git
 cd RAG-vienamese-documents
 ```
 
-### 12.2. Create a Virtual Environment
+### 13.2. Create a Virtual Environment
 
 **Windows PowerShell:**
 
@@ -649,7 +835,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 ```
 
-### 12.3. Install Dependencies
+### 13.3. Install Dependencies
 
 ```bash
 python -m pip install --upgrade pip
@@ -657,20 +843,11 @@ python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
-Ensure the required dependencies are included in `requirements.txt`, such as:
+```bash
+python -m pip install "mcp[cli]>=1.28,<2"
+```
 
-- FastAPI
-- Uvicorn
-- python-multipart
-- sentence-transformers
-- chromadb
-- google-genai
-- python-dotenv
-- Streamlit
-- Requests
-- langchain-text-splitters
-
-### 12.4. Configure Environment Variables
+### 13.4. Configure Environment Variables
 
 Create a `.env` file in the project root:
 
@@ -678,7 +855,7 @@ Create a `.env` file in the project root:
 GEMINI_API_KEY=your_gemini_api_key
 ```
 
-### 12.5. Start FastAPI Backend
+### 13.5. Start FastAPI Backend
 
 Open the first terminal at the project root:
 
@@ -698,7 +875,7 @@ Swagger UI:
 http://127.0.0.1:8000/docs
 ```
 
-### 12.6. Start Streamlit Frontend
+### 13.6. Start Streamlit Frontend
 
 Open a second terminal at the project root:
 
@@ -714,133 +891,20 @@ http://localhost:8501
 
 The frontend communicates with the local FastAPI backend through the configured `API_BASE_URL`.
 
-## 13. Deployment Architecture
+### 13.7. Start MCP Server
 
-The application can be demonstrated remotely using Streamlit Community Cloud while keeping the FastAPI backend and ChromaDB on a local machine.
+The MCP server can be launched using the installed MCP SDK.
 
-### 13.1. Demo Deployment Architecture
-
-```text
-                  Remote User
-                       |
-                       v
-             Streamlit Community Cloud
-                       |
-                       | HTTPS Request
-                       v
-              Cloudflare Quick Tunnel
-                       |
-                       v
-                Local FastAPI
-                       |
-             +---------+---------+
-             |                   |
-             v                   v
-         QA Pipeline       Indexing Pipeline
-             |                   |
-             v                   v
-           Gemini              ChromaDB
-                                 |
-                                 v
-                         Local Persistent Disk
+```bash
+python -m mcp_app.server
 ```
 
-### 13.2. Deployment Components
+Alternatively, use `uv` to run the server with the MCP dependency:
 
-| Component | Hosting / Storage |
-|---|---|
-| Streamlit Frontend | Streamlit Community Cloud |
-| FastAPI Backend | Local machine |
-| Public API Access | Cloudflare Quick Tunnel |
-| Vector Database | Local persistent ChromaDB |
-| LLM | Google Gemini API |
-
-### 13.3. API Configuration
-
-For local development, the frontend can use:
-
-```python
-API_BASE_URL = os.getenv(
-    "API_BASE_URL",
-    "http://127.0.0.1:8000"
-)
+```bash
+uv run --with "mcp[cli]>=1.28,<2" python -m mcp_app.server
 ```
 
-For Streamlit Community Cloud, configure `API_BASE_URL` through Streamlit Secrets:
+The server communicates over STDIO and is intended to be launched by an MCP client rather than accessed through a browser URL.
 
-```toml
-API_BASE_URL = "https://your-tunnel-url.trycloudflare.com"
-```
-
-The Cloudflare Quick Tunnel URL exposes the local FastAPI service to the Streamlit Cloud application.
-
-**Deployment limitations:**
-
-- The local machine must remain powered on and connected to the Internet.
-- FastAPI and Cloudflare Tunnel must remain running.
-- The Quick Tunnel URL may change when the tunnel is recreated.
-- ChromaDB remains stored on the local machine.
-- This setup is intended for demonstration and testing, not reliable production hosting.
-
-The backend and vector database are not hosted on AWS in this deployment architecture.
-
-## 14. Security Considerations
-
-When exposing the backend through a public tunnel, consider the following:
-
-- Keep the Gemini API key in environment variables or Streamlit Secrets.
-- Never commit `.env` or other credential files.
-- Protect public API endpoints with authentication before sharing the application.
-- Validate uploaded files and restrict file sizes.
-- Avoid exposing internal exception details through API responses.
-- Restrict access to document upload endpoints to prevent unauthorized indexing.
-
-## 15. Development Status
-
-### Completed
-
-- [x] Project configuration and directory management.
-- [x] PDF upload API.
-- [x] PDF parsing module integration.
-- [x] Markdown-based chunking pipeline.
-- [x] Embedding generation integration.
-- [x] ChromaDB persistent storage integration.
-- [x] Indexing pipeline orchestration.
-- [x] Query embedding.
-- [x] Vector similarity search.
-- [x] Top-K document retrieval.
-- [x] Prompt template construction.
-- [x] Gemini LLM integration.
-- [x] Context-aware answer generation.
-- [x] QA pipeline orchestration.
-- [x] Chat API implementation.
-- [x] Logging and custom exception handling.
-- [x] Streamlit frontend implementation.
-- [x] PDF upload interface.
-- [x] Chat interface and answer display.
-- [x] Retrieved source display.
-- [x] Session-level chat history.
-
-### Potential Future Improvements
-
-- [ ] Retrieval quality evaluation.
-- [ ] Similarity score thresholding.
-- [ ] Reranking retrieved chunks.
-- [ ] Improved citation generation and validation.
-- [ ] Persistent conversation history and multi-turn chat.
-- [ ] Streaming LLM responses.
-- [ ] Improved document management interface.
-- [ ] API authentication and rate limiting.
-- [ ] Dockerization.
-- [ ] Stable cloud deployment.
-- [ ] Performance optimization and monitoring.
-
-## 16. Future Development Direction
-
-Potential next steps for improving the project include:
-
-1. **Retrieval Evaluation:** Build a test dataset to evaluate retrieval relevance and answer quality.
-2. **Retrieval Optimization:** Experiment with similarity thresholds and reranking strategies.
-3. **Answer Reliability:** Improve source attribution and validate generated citations.
-4. **Deployment:** Move the backend and vector database to a stable hosting environment.
-5. **Production Readiness:** Introduce authentication, request limits, monitoring, and persistent conversation storage.
+### 
